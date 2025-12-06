@@ -1,9 +1,9 @@
 import os
 import requests
 
-API_KEY  = os.getenv("OPENAI_API_KEY", "cse476")
-API_BASE = os.getenv("API_BASE", "http://10.4.58.53:41701/v1")  
-MODEL    = os.getenv("MODEL_NAME", "bens_model")              
+API_KEY  = os.getenv("OPENAI_API_KEY", "")
+API_BASE = os.getenv("API_BASE", "https://api.openai.com/v1")
+MODEL    = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
 def call_model_chat_completions(prompt: str,
                                 system: str = "You are a helpful assistant. Reply with only the final answer. no explanation needed.",

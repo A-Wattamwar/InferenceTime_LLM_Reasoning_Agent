@@ -16,12 +16,17 @@
    - **Iterative Refinement** (`technique3_refinement.py`, `iterative_refinement()`, lines 4-37): Generate answer, critique it, refine based on feedback
    - **PAL (Program-Aided Language)** (`technique4_pal.py`, `pal_solve()`, lines 4-30): For math problems, generates Python code and executes it locally for accurate computation
 
-3. **Answer Orchestrator** (`agent.py`, `solve()` function, lines 7-47)
-   - Routes questions to appropriate techniques based on type
-   - math: PAL + Self-Consistency
-   - general/coding/planning/future: Self-Consistency + CoT Verification
-   - Combines answers using confidence-weighted voting
-   - Returns the highest-confidence answer
+3. **Answer Orchestrator** (`agent.py`, `solve()` function)
+   - Routes each question to the technique best suited to its type, with a second technique as a backup / tie-breaker:
+     | Question type | Primary technique | Backup |
+     |---|---|---|
+     | math | PAL | Self-Consistency |
+     | coding | Iterative Refinement | CoT + Verification |
+     | planning | Iterative Refinement | Self-Consistency |
+     | future | CoT + Verification | Self-Consistency |
+     | general (common sense) | Self-Consistency | CoT + Verification |
+   - For coding/planning, returns the highest-confidence answer
+   - For math/general/future, combines answers using confidence-weighted voting and returns the original-cased representative answer (preserves proper nouns like "Arthur's Magazine")
 
 ### Additional Highlights
 
@@ -40,7 +45,7 @@ cd CSE476_FinalProject_InferenceTime
 
 ## Requirements
 
-- ASU VPN or ASU network connection (required to access the API)
+- An OpenAI API key (the agent calls the OpenAI Chat Completions API)
 
 - Python Requests
 
@@ -48,12 +53,27 @@ cd CSE476_FinalProject_InferenceTime
 pip3 install requests
 ```
 
-I originally tried installing requests with the code above. 
-But that didn't work on my Mac, probably because macOS protects certain system‑managed Python packages. The command that actually worked was:
+If that fails on macOS (system-managed Python protects certain packages), use:
 
 ```bash
 pip3 install --break-system-packages requests
 ```
+
+### Configure the API
+
+The agent reads its endpoint, model, and key from environment variables
+(`api.py`). Defaults point at OpenAI's API with `gpt-4o-mini`. Set your key
+before running:
+
+```bash
+export OPENAI_API_KEY='sk-...your-key...'
+# optional overrides:
+export MODEL_NAME='gpt-4o-mini'          # or gpt-4o for a stronger model
+export API_BASE='https://api.openai.com/v1'
+```
+
+> Note: avoid the `o1`/`o3`/`gpt-5` reasoning models here — they reject the
+> `temperature` parameter that `api.py` sends.
 
 ## How to Run on a New Test Case
 
@@ -87,6 +107,36 @@ python3 generate_answer_template.py
 
 This generates `cse_476_final_project_answers.json` for submission.
 
+## Demo
+
+Run the demo script to test all four techniques individually, then watch the
+full agent route questions on its own:
+
+```bash
+export OPENAI_API_KEY='sk-...your-key...'
+cd agent
+python3 demo.py
+```
+
+Each technique is exercised directly with a question that shows it at its best:
+
+| # | Technique | Demo question | Expected answer |
+|---|---|---|---|
+| 1 | **PAL** (Program-Aided Language) | "A bakery sells muffins for \$3 each and cookies for \$2 each. If I buy 7 muffins and 5 cookies, how much do I spend in total?" | `31` — generates `answer = 7*3 + 5*2` and executes it (confidence 0.95) |
+| 2 | **Self-Consistency** | "Which planet in our solar system is known as the Red Planet?" | `Mars` — majority vote across 3 samples |
+| 3 | **Iterative Refinement** | "What is the capital city of Australia?" | `Canberra` — draft, self-critique, then refine |
+| 4 | **Chain-of-Thought + Verification** | "Tom is older than Jane. Jane is older than Sam. Who is the youngest of the three?" | `Sam` — reasons step by step, then a verification call confirms it |
+
+The script then calls `solve()` on a math and a coding question to show the
+classifier routing each to the right technique automatically.
+
+You can also run any single question directly:
+
+```bash
+cd agent
+python3 -c "from agent import solve; print(solve('What is 25 * 4?'))"  # 100
+```
+
 ## Development & Evaluation
 
 ### How I Built It
@@ -116,6 +166,7 @@ technique1_self_consistency.py  # Self-consistency with majority voting
 technique2_cot_verify.py        # Chain-of-thought with verification
 technique3_refinement.py        # Iterative refinement
 technique4_pal.py               # Program-aided language for math
+demo.py                         # Demo script - one question per technique
 README.md                       # This file
 ```
 
